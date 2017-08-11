@@ -1,0 +1,36 @@
+name:                miso-middleware
+version:             0.1.0
+-- synopsis:
+-- description:
+homepage:            https://github.com/cocreature/miso-middleware#readme
+license:             BSD3
+license-file:        LICENSE
+author:              Moritz Kiefer
+maintainer:          moritz.kiefer@purelyfunctional.org
+copyright:           (C) 2017 Moritz Kiefer
+category:            Web
+build-type:          Simple
+extra-source-files:  README.md
+cabal-version:       >=1.10
+
+library
+  hs-source-dirs:      src
+  exposed-modules:     Miso.Middleware.Internal
+                       Miso.Middleware.Persist
+                       Miso.Middleware.Trace
+  build-depends:       aeson >= 0.9 && < 1.3
+                     , base  >= 4.7 && < 4.11
+                     , miso  >= 0.7 && < 0.8
+  default-language:    Haskell2010
+
+executable simple
+  hs-source-dirs:      examples
+  main-is:             Main.hs
+  build-depends:       base >= 4.7 && < 4.11
+                     , miso >= 0.7 && < 0.8
+                     , miso-middleware
+  default-language:    Haskell2010
+
+source-repository head
+  type:     git
+  location: https://github.com/cocreature/miso-middleware
