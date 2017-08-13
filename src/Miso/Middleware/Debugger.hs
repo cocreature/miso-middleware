@@ -4,11 +4,15 @@ module Miso.Middleware.Debugger
   ( withDebugger
   ) where
 
-import Data.Maybe
-import Miso
+import qualified Data.Map as Map
+import           Data.Maybe
+import           Data.Monoid
+import           Miso
+import           Miso.String (ms)
+import qualified Miso.Svg as Svg
 
-import Miso.Middleware.Internal
-import Miso.Middleware.Internal.Tree
+import           Miso.Middleware.Internal
+import           Miso.Middleware.Internal.Tree
 
 newtype DebuggerModel model =
   DebuggerModel (RoseZipper model)
@@ -20,18 +24,60 @@ data DebuggerAction action
   | Other !action
   deriving (Show, Eq, Ord)
 
-renderDebugger :: DebuggerModel model -> View (DebuggerAction action)
-renderDebugger _ =
+renderDebugger :: Show model => DebuggerModel model -> View (DebuggerAction action)
+renderDebugger m@(DebuggerModel (RoseZipper (RoseTree _ cs) ps)) =
   div_
-    []
-    [ button_ [onClick MoveUp] ["move up"]
-    , button_ [onClick (MoveDown 0)] ["move down"]
+    [style_ (Map.fromList [("display", "flex")])]
+    [ Svg.svg_
+        [ width_ "800"
+        , height_ "300"
+        , style_ (Map.fromList [("border-style", "solid")])
+        ]
+        (parents ++
+         (Svg.circle_
+            [ Svg.cx_ "50%"
+            , Svg.cy_ "50%"
+            , Svg.r_ "30"
+            , Svg.fill_ "grey"
+            , Svg.onClick MoveUp
+            ]
+            [] :
+          zipWith drawChild cs [0 ..]))
+    , div_ [] [text (ms (show (extractModel m)))]
     ]
+  where
+    drawChild _ i =
+      Svg.circle_
+        [ Svg.cy_ "75%"
+        , Svg.cx_ (ms (show xPos) <> "%")
+        , Svg.r_ "30"
+        , Svg.fill_ "grey"
+        , Svg.onClick (MoveDown i)
+        ]
+        []
+      where
+        delta = 1 / (fromIntegral (length cs) + 1)
+        xPos = (fromIntegral i + 1) * delta * 100
+    parents :: [View (DebuggerAction action)]
+    parents =
+      case ps of
+        [] -> []
+        (_:_) -> [drawParent]
+    drawParent :: View (DebuggerAction action)
+    drawParent =
+      Svg.circle_
+        [ Svg.cy_ "25%"
+        , Svg.cx_ "50%"
+        , Svg.r_ "30"
+        , Svg.fill_ "grey"
+        , Svg.onClick MoveUp
+        ]
+        []
 
 extractModel :: DebuggerModel model -> model
 extractModel (DebuggerModel (RoseZipper (RoseTree m _) _)) = m
 
-withDebugger :: App model action -> App (DebuggerModel model) (DebuggerAction action)
+withDebugger :: Show model => App model action -> App (DebuggerModel model) (DebuggerAction action)
 withDebugger (App model update view subs events initialAction) =
   App model' update' view' (map mapSub subs) events (Other initialAction)
   where
