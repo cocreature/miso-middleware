@@ -35,22 +35,28 @@ renderDebugger m@(DebuggerModel (RoseZipper (RoseTree _ cs) ps)) =
         ]
         (parents ++
          (Svg.circle_
+            [Svg.cx_ "50%", Svg.cy_ "50%", Svg.r_ "15", Svg.fill_ "grey"]
+            [] :
+          Svg.circle_
             [ Svg.cx_ "50%"
             , Svg.cy_ "50%"
-            , Svg.r_ "30"
-            , Svg.fill_ "grey"
-            , Svg.onClick MoveUp
+            , Svg.r_ "15"
+            , Svg.fill_ "none"
+            , Svg.stroke_ "orange"
+            , Svg.strokeWidth_ "10"
             ]
             [] :
           zipWith drawChild cs [0 ..]))
     , div_ [] [text (ms (show (extractModel m)))]
     ]
   where
+    levelDist = 10
+    radius = "10"
     drawChild _ i =
       Svg.circle_
         [ Svg.cy_ "75%"
         , Svg.cx_ (ms (show xPos) <> "%")
-        , Svg.r_ "30"
+        , Svg.r_ radius
         , Svg.fill_ "grey"
         , Svg.onClick (MoveDown i)
         ]
@@ -68,7 +74,7 @@ renderDebugger m@(DebuggerModel (RoseZipper (RoseTree _ cs) ps)) =
       Svg.circle_
         [ Svg.cy_ "25%"
         , Svg.cx_ "50%"
-        , Svg.r_ "30"
+        , Svg.r_ radius
         , Svg.fill_ "grey"
         , Svg.onClick MoveUp
         ]
