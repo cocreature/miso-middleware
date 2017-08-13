@@ -8,7 +8,7 @@ import qualified Data.Map as Map
 import           Data.Maybe
 import           Data.Monoid
 import           Miso
-import           Miso.String (ms)
+import           Miso.String (ms, MisoString)
 import qualified Miso.Svg as Svg
 
 import           Miso.Middleware.Internal
@@ -46,39 +46,114 @@ renderDebugger m@(DebuggerModel (RoseZipper (RoseTree _ cs) ps)) =
             , Svg.strokeWidth_ "10"
             ]
             [] :
-          zipWith drawChild cs [0 ..]))
+          concat (zipWith drawChild cs [0 ..])))
     , div_ [] [text (ms (show (extractModel m)))]
     ]
   where
     levelDist = 10
     radius = "10"
     drawChild _ i =
-      Svg.circle_
-        [ Svg.cy_ "75%"
-        , Svg.cx_ (ms (show xPos) <> "%")
-        , Svg.r_ radius
-        , Svg.fill_ "grey"
-        , Svg.onClick (MoveDown i)
-        ]
-        []
+      [ Svg.line_
+          [ Svg.y1_ "75%"
+          , Svg.x1_ (ms (show xPos) <> "%")
+          , Svg.y2_ "50%"
+          , Svg.x2_ "50%"
+          , strokeWidth "2"
+          , Svg.stroke_ "grey"
+          ]
+          []
+      , Svg.circle_
+          [ Svg.cy_ "75%"
+          , Svg.cx_ (ms (show xPos) <> "%")
+          , Svg.r_ radius
+          , Svg.fill_ "grey"
+          , Svg.onClick (MoveDown i)
+          ]
+          []
+      ]
       where
         delta = 1 / (fromIntegral (length cs) + 1)
         xPos = (fromIntegral i + 1) * delta * 100
     parents :: [View (DebuggerAction action)]
     parents =
-      case ps of
-        [] -> []
-        (_:_) -> [drawParent]
-    drawParent :: View (DebuggerAction action)
-    drawParent =
+      Svg.line_
+        [ Svg.x1_ "50%"
+        , Svg.x2_ "50%"
+        , Svg.y1_ "50%"
+        , Svg.y2_ "35%"
+        , strokeWidth "2"
+        , Svg.stroke_ "grey"
+        ]
+        [] :
+      concat (zipWith drawParent (take 3 ps) [35,25 ..]) ++
+      if length ps <= 3
+        then let y = ms (show (35 - (10 * length ps))) <> "%"
+             in [ Svg.line_
+                    [ Svg.x1_ "48%"
+                    , Svg.x2_ "52%"
+                    , Svg.y1_ y
+                    , Svg.y2_ y
+                    , strokeWidth "2"
+                    , Svg.stroke_ "grey"
+                    ]
+                    []
+                ]
+        else []
+    drawParent ::
+         ([RoseTree model], model, [RoseTree model])
+      -> Int
+      -> [View (DebuggerAction action)]
+    drawParent (ls, _, rs) height =
+      Svg.line_
+        [ Svg.x1_ "50%"
+        , Svg.x2_ "50%"
+        , Svg.y1_ height'
+        , Svg.y2_ (ms (show (height - 10)) <> "%")
+        , strokeWidth "2"
+        , Svg.stroke_ "grey"
+        ]
+        [] :
       Svg.circle_
-        [ Svg.cy_ "25%"
+        [ Svg.cy_ height'
         , Svg.cx_ "50%"
         , Svg.r_ radius
         , Svg.fill_ "grey"
         , Svg.onClick MoveUp
         ]
-        []
+        [] :
+      leftArrow ++ rightArrow
+      where
+        height' = ms (show height) <> "%"
+        heightArrowEnd = ms (show (height + 5)) <> "%"
+        leftArrow
+          | null ls = []
+          | otherwise =
+            [ Svg.line_
+                [ Svg.x1_ "50%"
+                , Svg.x2_ "35%"
+                , Svg.y1_ height'
+                , Svg.y2_ heightArrowEnd
+                , strokeWidth "2"
+                , Svg.stroke_ "grey"
+                ]
+                []
+            ]
+        rightArrow
+          | null rs = []
+          | otherwise =
+            [ Svg.line_
+                [ Svg.x1_ "50%"
+                , Svg.x2_ "65%"
+                , Svg.y1_ height'
+                , Svg.y2_ heightArrowEnd
+                , strokeWidth "2"
+                , Svg.stroke_ "grey"
+                ]
+                []
+            ]
+
+strokeWidth :: MisoString -> Attribute action
+strokeWidth = textProp "stroke-width"
 
 extractModel :: DebuggerModel model -> model
 extractModel (DebuggerModel (RoseZipper (RoseTree m _) _)) = m
