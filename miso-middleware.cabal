@@ -15,7 +15,9 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
-  exposed-modules:     Miso.Middleware.Internal
+  exposed-modules:     Miso.Middleware.Debugger
+                       Miso.Middleware.Internal
+                       Miso.Middleware.Internal.Tree
                        Miso.Middleware.Persist
                        Miso.Middleware.Trace
   build-depends:       aeson >= 0.9 && < 1.3

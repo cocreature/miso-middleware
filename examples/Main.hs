@@ -3,6 +3,7 @@
 module Main where
 
 import Miso
+import Miso.Middleware.Debugger
 import Miso.Middleware.Persist
 import Miso.Middleware.Trace
 import Miso.String
@@ -10,7 +11,7 @@ import Miso.String
 type Model = Int
 
 main :: IO ()
-main = startApp (withTrace (withPersistentModel NoOp originalApp))
+main = startApp (withTrace (withDebugger originalApp))
 
 originalApp :: App Model Action
 originalApp =
@@ -20,21 +21,18 @@ originalApp =
   , view = viewModel
   , events = defaultEvents
   , subs = []
-  , initialAction = SayHelloWorld
+  , initialAction = NoOp
   }
 
 updateModel :: Action -> Model -> Effect Action Model
 updateModel AddOne m = noEff (m + 1)
 updateModel SubtractOne m = noEff (m - 1)
 updateModel NoOp m = noEff m
-updateModel SayHelloWorld m = m <# do
-  putStrLn "Hello World!" >> pure NoOp
 
 data Action
   = AddOne
   | SubtractOne
   | NoOp
-  | SayHelloWorld
   deriving (Show, Eq)
 
 viewModel :: Int -> View Action
