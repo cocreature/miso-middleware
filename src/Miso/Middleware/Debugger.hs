@@ -97,9 +97,13 @@ withPositions tree = withPos 0 tree
         y = 95 * (level + 1) / (fromIntegral h + 2) + 2.5
 
 drawTree :: RoseTree ([Direction], model) -> View (DebuggerAction action)
-drawTree tree = Svg.g_ [] (drawTree' locatedTree ++ drawFocused locatedTree)
+drawTree tree =
+  Svg.svg_
+    [Svg.x_ (ms (show (50 - x)) <> "%"), Svg.y_ (ms (show (50 - y)) <> "%")]
+    (drawTree' locatedTree ++ drawFocused locatedTree)
   where
     locatedTree = withPositions (makeAbsolute (design tree))
+    (x, y) = head (getFocused locatedTree)
     drawTree' (RoseTree ((x, y), (moves, _)) cs) =
       lines ++
       Svg.circle_
@@ -124,6 +128,12 @@ drawTree tree = Svg.g_ [] (drawTree' locatedTree ++ drawFocused locatedTree)
                  ]
                  [])
             cs
+
+getFocused :: RoseTree (a, ([Direction], model)) -> [a]
+getFocused (RoseTree (a, ([], _)) _) =
+  [a]
+getFocused (RoseTree _ cs) =
+  getFocused =<< cs
 
 drawFocused :: RoseTree ((Double,Double), ([Direction], model)) -> [View (DebuggerAction action)]
 drawFocused (RoseTree ((x, y), ([], _)) _) =
