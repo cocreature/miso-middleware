@@ -19,14 +19,58 @@ newtype DebuggerModel model =
   DebuggerModel (RoseZipper model)
   deriving (Show, Eq, Ord)
 
+data Direction
+  = Up
+  | Down !Int
+  deriving (Show, Eq, Ord)
+
 data DebuggerAction action
-  = MoveDown !Int
-  | MoveUp
+  = Move [Direction]
   | Other !action
   deriving (Show, Eq, Ord)
 
+unfoldZipper :: RoseZipper a -> RoseTree a
+unfoldZipper (RoseZipper t []) = t
+unfoldZipper (RoseZipper t ((ls, v, rs):ps)) =
+  unfoldZipper (RoseZipper (RoseTree v (ls ++ [t] ++ rs)) ps)
+
+withZipperMoves :: RoseZipper a -> RoseZipper ([Direction], a)
+withZipperMoves (RoseZipper t ps) =
+  RoseZipper
+    (withTreeMoves t)
+    (zipWith
+       (\(ls, p, rs) ups ->
+          let (ls', rs') = withParentMoves (ls, rs)
+              addUps (ms, v) = (ups ++ ms, v)
+          in (map (fmap addUps) ls', (ups, p), map (fmap addUps) rs'))
+       ps
+       (iterate (Up :) [Up]))
+  where
+    withParentMoves ::
+         ([RoseTree a], [RoseTree a])
+      -> ([RoseTree ([Direction], a)], [RoseTree ([Direction], a)])
+    withParentMoves (ls, rs) = (ls', rs')
+      where
+        ls' =
+          zipWith
+            (\l i -> (\(ms, v) -> (Down i : ms, v)) <$> withTreeMoves l)
+            ls
+            [0 ..]
+        rs' =
+          zipWith
+            (\r i -> (\(ms, v) -> (Down i : ms, v)) <$> withTreeMoves r)
+            rs
+            [length ls + 1 ..]
+withTreeMoves :: RoseTree a -> RoseTree ([Direction], a)
+withTreeMoves (RoseTree v cs) =
+  RoseTree
+    ([], v)
+    ((zipWith (\c i -> fmap (\(ms, v') -> (Down i : ms, v')) (withTreeMoves c)))
+       cs
+       [0 ..])
+
 renderDebugger :: Show model => DebuggerModel model -> View (DebuggerAction action)
-renderDebugger m =
+renderDebugger m@(DebuggerModel tree) =
   div_
     [style_ (Map.fromList [("display", "flex")])]
     [ Svg.svg_
@@ -34,14 +78,7 @@ renderDebugger m =
         , height_ "300"
         , style_ (Map.fromList [("border-style", "solid")])
         ]
-        [ drawTree
-            (RoseTree
-               ()
-               [ RoseTree () [RoseTree () [], RoseTree () [], RoseTree () []]
-               , RoseTree () []
-               , RoseTree () [RoseTree () [], RoseTree () [], RoseTree () []]
-               ])
-        ]
+        [drawTree (unfoldZipper (withZipperMoves tree))]
     , div_ [] [text (ms (show (extractModel m)))]
     ]
 
@@ -53,17 +90,24 @@ withPositions tree = withPos 0 tree
     withPos !level (RoseTree (WithLocation v xPos) cs) =
       RoseTree ((x, y), v) (map (withPos (level + 1)) cs)
       where
-        x = 70 * (xPos - leftBound) / (rightBound - leftBound) + 15
+        x =
+          if leftBound == rightBound
+            then 50
+            else 70 * (xPos - leftBound) / (rightBound - leftBound) + 15
         y = 95 * (level + 1) / (fromIntegral h + 2) + 2.5
 
-drawTree :: RoseTree model -> View (DebuggerAction action)
-drawTree tree = Svg.g_ [] (drawTree' locatedTree)
+drawTree :: RoseTree ([Direction], model) -> View (DebuggerAction action)
+drawTree tree = Svg.g_ [] (drawTree' locatedTree ++ drawFocused locatedTree)
   where
     locatedTree = withPositions (makeAbsolute (design tree))
-    drawTree' (RoseTree ((x, y), _) cs) =
+    drawTree' (RoseTree ((x, y), (moves, _)) cs) =
       lines ++
       Svg.circle_
-        [Svg.r_ "4", Svg.cx_ (ms (show x) <> "%"), Svg.cy_ (ms (show y) <> "%")]
+        [ Svg.r_ "10"
+        , Svg.cx_ (ms (show x) <> "%")
+        , Svg.cy_ (ms (show y) <> "%")
+        , Svg.onClick (Move moves)
+        ]
         [] :
       (drawTree' =<< cs)
       where
@@ -81,18 +125,40 @@ drawTree tree = Svg.g_ [] (drawTree' locatedTree)
                  [])
             cs
 
+drawFocused :: RoseTree ((Double,Double), ([Direction], model)) -> [View (DebuggerAction action)]
+drawFocused (RoseTree ((x, y), ([], _)) _) =
+  [ Svg.circle_
+      [ Svg.r_ "12"
+      , Svg.cx_ (ms (show x) <> "%")
+      , Svg.cy_ (ms (show y) <> "%")
+      , Svg.strokeWidth_ "4"
+      , Svg.stroke_ "orange"
+      ]
+      []
+  ]
+drawFocused (RoseTree _ cs) = drawFocused =<< cs
+
 extractModel :: DebuggerModel model -> model
 extractModel (DebuggerModel (RoseZipper (RoseTree m _) _)) = m
+
+applyMove :: [Direction] -> RoseZipper a -> RoseZipper a
+applyMove [] t = t
+applyMove (Up:ms) t =
+  case moveUp t of
+    Just t' -> applyMove ms t'
+    Nothing -> t
+applyMove (Down i:ms) t =
+  case moveDown i t of
+    Just t' -> applyMove ms t'
+    Nothing -> t
 
 withDebugger :: Show model => App model action -> App (DebuggerModel model) (DebuggerAction action)
 withDebugger (App model update view subs events initialAction) =
   App model' update' view' (map mapSub subs) events (Other initialAction)
   where
     model' = DebuggerModel (RoseZipper (RoseTree model []) [])
-    update' MoveUp (DebuggerModel tree) =
-      noEff (DebuggerModel (fromMaybe tree (moveUp tree)))
-    update' (MoveDown i) (DebuggerModel tree) =
-      noEff (DebuggerModel (fromMaybe tree (moveDown i tree)))
+    update' (Move ms) (DebuggerModel tree) =
+      noEff (DebuggerModel (applyMove ms tree))
     update' (Other act) model@(DebuggerModel tree) =
       case update act (extractModel model) of
         Effect m' acts ->
@@ -100,7 +166,8 @@ withDebugger (App model update view subs events initialAction) =
           in Effect (DebuggerModel tree') (map (fmap Other) acts)
     view' model =
       div_ [] [renderDebugger model, fmapView Other (view (extractModel model))]
-    mapSub :: Sub action model -> Sub (DebuggerAction action) (DebuggerModel model)
+    mapSub ::
+         Sub action model -> Sub (DebuggerAction action) (DebuggerModel model)
     mapSub sub =
       mapSubAction
         Other
