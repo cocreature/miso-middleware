@@ -79,7 +79,9 @@ renderDebugger m@(DebuggerModel tree) =
         , style_ (Map.fromList [("border-style", "solid")])
         ]
         [drawTree (unfoldZipper (withZipperMoves (fmap snd tree)))]
-    , div_ [] [text (ms (show (extractModel m)))]
+    , div_
+        [style_ (Map.fromList [("margin", "10px 10px")])]
+        [h3_ [] ["Current state"], text (ms (show (extractModel m)))]
     ]
 
 withPositions :: RoseTree (WithLocation a) -> RoseTree ((Double, Double), a)
