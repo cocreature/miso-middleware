@@ -15,8 +15,8 @@ import qualified Miso.Svg as Svg
 import           Miso.Middleware.Internal
 import           Miso.Middleware.Internal.Tree
 
-newtype DebuggerModel model =
-  DebuggerModel (RoseZipper model)
+newtype DebuggerModel action model =
+  DebuggerModel (RoseZipper (model, Maybe action))
   deriving (Show, Eq, Ord)
 
 data Direction
@@ -69,16 +69,16 @@ withTreeMoves (RoseTree v cs) =
        cs
        [0 ..])
 
-renderDebugger :: Show model => DebuggerModel model -> View (DebuggerAction action)
+renderDebugger :: (Show model, Show action) => DebuggerModel action model -> View (DebuggerAction action)
 renderDebugger m@(DebuggerModel tree) =
   div_
     [style_ (Map.fromList [("display", "flex")])]
     [ Svg.svg_
-        [ width_ "800"
+        [ width_ "400"
         , height_ "300"
         , style_ (Map.fromList [("border-style", "solid")])
         ]
-        [drawTree (unfoldZipper (withZipperMoves tree))]
+        [drawTree (unfoldZipper (withZipperMoves (fmap snd tree)))]
     , div_ [] [text (ms (show (extractModel m)))]
     ]
 
@@ -93,7 +93,7 @@ withPositions tree = withPos 0 tree
         x = 20 * xPos
         y = 20 * level
 
-drawTree :: RoseTree ([Direction], model) -> View (DebuggerAction action)
+drawTree :: Show action => RoseTree ([Direction], Maybe action) -> View (DebuggerAction action)
 drawTree tree = Svg.svg_ [] (drawTree' locatedTree ++ drawFocused locatedTree)
   where
     locatedTree =
@@ -113,16 +113,18 @@ drawTree tree = Svg.svg_ [] (drawTree' locatedTree ++ drawFocused locatedTree)
       where
         lines =
           map
-            (\(RoseTree ((x', y'), _) _) ->
+            (\(RoseTree ((x', y'), (_, act)) _) ->
                Svg.line_
                  [ Svg.x1_ (ms (show x) <> "%")
                  , Svg.y1_ (ms (show y) <> "%")
                  , Svg.x2_ (ms (show x') <> "%")
                  , Svg.y2_ (ms (show y') <> "%")
                  , Svg.stroke_ "black"
-                 , Svg.strokeWidth_ "2"
+                 , Svg.strokeWidth_ "4"
                  ]
-                 [])
+                 (case act of
+                    Nothing -> []
+                    Just act' -> [Svg.title_ [] [text (ms (show act'))]]))
             cs
 
 getFocused :: RoseTree (a, ([Direction], model)) -> [a]
@@ -144,8 +146,8 @@ drawFocused (RoseTree ((x, y), ([], _)) _) =
   ]
 drawFocused (RoseTree _ cs) = drawFocused =<< cs
 
-extractModel :: DebuggerModel model -> model
-extractModel (DebuggerModel (RoseZipper (RoseTree m _) _)) = m
+extractModel :: DebuggerModel action model -> model
+extractModel (DebuggerModel (RoseZipper (RoseTree (m, _) _) _)) = m
 
 applyMove :: [Direction] -> RoseZipper a -> RoseZipper a
 applyMove [] t = t
@@ -158,22 +160,23 @@ applyMove (Down i:ms) t =
     Just t' -> applyMove ms t'
     Nothing -> t
 
-withDebugger :: Show model => App model action -> App (DebuggerModel model) (DebuggerAction action)
+withDebugger :: (Show model, Show action) => App model action -> App (DebuggerModel action model) (DebuggerAction action)
 withDebugger (App model update view subs events initialAction) =
   App model' update' view' (map mapSub subs) events (Other initialAction)
   where
-    model' = DebuggerModel (RoseZipper (RoseTree model []) [])
+    model' = DebuggerModel (RoseZipper (RoseTree (model, Nothing) []) [])
     update' (Move ms) (DebuggerModel tree) =
       noEff (DebuggerModel (applyMove ms tree))
     update' (Other act) model@(DebuggerModel tree) =
       case update act (extractModel model) of
         Effect m' acts ->
-          let tree' = insertAndMoveTo (RoseTree m' []) tree
+          let tree' = insertAndMoveTo (RoseTree (m', Just act) []) tree
           in Effect (DebuggerModel tree') (map (fmap Other) acts)
     view' model =
       div_ [] [renderDebugger model, fmapView Other (view (extractModel model))]
     mapSub ::
-         Sub action model -> Sub (DebuggerAction action) (DebuggerModel model)
+         Sub action model
+      -> Sub (DebuggerAction action) (DebuggerModel action model)
     mapSub sub =
       mapSubAction
         Other

@@ -22,7 +22,7 @@ data RoseTree a = RoseTree a [RoseTree a] deriving (Show, Eq, Ord, Functor)
 data RoseZipper a =
   RoseZipper (RoseTree a)
        [([RoseTree a], a, [RoseTree a])]
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Functor)
 
 moveUp :: RoseZipper a -> Maybe (RoseZipper a)
 moveUp (RoseZipper _ []) = Nothing
