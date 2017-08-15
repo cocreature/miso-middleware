@@ -90,20 +90,16 @@ withPositions tree = withPos 0 tree
     withPos !level (RoseTree (WithLocation v xPos) cs) =
       RoseTree ((x, y), v) (map (withPos (level + 1)) cs)
       where
-        x =
-          if leftBound == rightBound
-            then 50
-            else 70 * (xPos - leftBound) / (rightBound - leftBound) + 15
-        y = 95 * (level + 1) / (fromIntegral h + 2) + 2.5
+        x = 20 * xPos
+        y = 20 * level
 
 drawTree :: RoseTree ([Direction], model) -> View (DebuggerAction action)
-drawTree tree =
-  Svg.svg_
-    [Svg.x_ (ms (show (50 - x)) <> "%"), Svg.y_ (ms (show (50 - y)) <> "%")]
-    (drawTree' locatedTree ++ drawFocused locatedTree)
+drawTree tree = Svg.svg_ [] (drawTree' locatedTree ++ drawFocused locatedTree)
   where
-    locatedTree = withPositions (makeAbsolute (design tree))
-    (x, y) = head (getFocused locatedTree)
+    locatedTree =
+      fmap (\((x', y'), v) -> ((50 + x' - x, 50 + y' - y), v)) locatedTree'
+    locatedTree' = withPositions (makeAbsolute (design tree))
+    (x, y) = head (getFocused locatedTree')
     drawTree' (RoseTree ((x, y), (moves, _)) cs) =
       lines ++
       Svg.circle_
