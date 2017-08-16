@@ -15,9 +15,20 @@ import qualified Miso.Svg as Svg
 import           Miso.Middleware.Internal
 import           Miso.Middleware.Internal.Tree
 
-newtype DebuggerModel action model =
-  DebuggerModel (RoseZipper (model, Maybe action))
-  deriving (Show, Eq, Ord)
+foreign import javascript unsafe "$r = performance.now();" now ::
+               IO Double
+
+data AnimationState = AnimationState
+  { startPos :: !(Double, Double)
+  , startTime :: !Double
+  , animationPos :: !Double -- ^ Double between 0 and 1 indicating the
+                            -- position in the animation
+  } deriving (Show, Eq, Ord)
+
+data DebuggerModel action model = DebuggerModel
+  { debuggerHistory :: !(RoseZipper (model, Maybe action))
+  , animationState :: !(Maybe AnimationState)
+  } deriving (Show, Eq, Ord)
 
 data Direction
   = Up
@@ -26,6 +37,8 @@ data Direction
 
 data DebuggerAction action
   = Move [Direction]
+  | StartAnimation [Direction] !Double
+  | AnimationFrame !Double
   | Other !action
   deriving (Show, Eq, Ord)
 
@@ -70,7 +83,7 @@ withTreeMoves (RoseTree v cs) =
        [0 ..])
 
 renderDebugger :: (Show model, Show action) => DebuggerModel action model -> View (DebuggerAction action)
-renderDebugger m@(DebuggerModel tree) =
+renderDebugger m@(DebuggerModel tree animationState) =
   div_
     [style_ (Map.fromList [("display", "flex")])]
     [ Svg.svg_
@@ -78,7 +91,11 @@ renderDebugger m@(DebuggerModel tree) =
         , height_ (show' height)
         , style_ (Map.fromList [("border-style", "solid")])
         ]
-        [drawTree (width, height) (unfoldZipper (withZipperMoves (fmap snd tree)))]
+        [ drawTree
+            (width, height)
+            animationState
+            (unfoldZipper (withZipperMoves (fmap snd tree)))
+        ]
     , div_
         [style_ (Map.fromList [("margin", "10px 10px")])]
         [h3_ [] ["Current state"], text (ms (show (extractModel m)))]
@@ -101,8 +118,25 @@ withPositions tree = withPos 0 tree
 show' :: Show a => a -> MisoString
 show' = ms . show
 
-drawTree :: Show action => (Int, Int) -> RoseTree ([Direction], Maybe action) -> View (DebuggerAction action)
-drawTree (width, height) tree =
+getFocusedPos :: RoseZipper a -> (Double, Double)
+getFocusedPos =
+  head .
+  getFocused .
+  withPositions . makeAbsolute . design . unfoldZipper . withZipperMoves
+
+(*^) :: Num a => a -> (a, a) -> (a, a)
+(*^) s (!x,!y) = (s * x, s * y)
+
+(^+^) :: Num a => (a, a) -> (a, a) -> (a, a)
+(!x,!y) ^+^ (!x',!y') = (x+x', y+y')
+
+interpolate :: Maybe AnimationState -> (Double, Double) -> (Double, Double)
+interpolate Nothing pos = pos
+interpolate (Just (AnimationState start _ t)) pos =
+  ((1 - t) *^ start) ^+^ (t *^ pos)
+
+drawTree :: Show action => (Int, Int) -> Maybe AnimationState -> RoseTree ([Direction], Maybe action) -> View (DebuggerAction action)
+drawTree (width, height) animationState tree =
   Svg.g_
     [ Svg.transform_
         ("translate" <>
@@ -111,7 +145,7 @@ drawTree (width, height) tree =
     (drawTree' locatedTree ++ drawFocused locatedTree)
   where
     locatedTree = withPositions (makeAbsolute (design tree))
-    (x, y) = head (getFocused locatedTree)
+    (x, y) = interpolate animationState (head (getFocused locatedTree))
     drawTree' (RoseTree ((x, y), (moves, _)) cs) =
       lines ++
       Svg.circle_
@@ -159,7 +193,7 @@ drawFocused (RoseTree ((x, y), ([], _)) _) =
 drawFocused (RoseTree _ cs) = drawFocused =<< cs
 
 extractModel :: DebuggerModel action model -> model
-extractModel (DebuggerModel (RoseZipper (RoseTree (m, _) _) _)) = m
+extractModel (DebuggerModel (RoseZipper (RoseTree (m, _) _) _) _) = m
 
 applyMove :: [Direction] -> RoseZipper a -> RoseZipper a
 applyMove [] t = t
@@ -176,14 +210,34 @@ withDebugger :: (Show model, Show action) => App model action -> App (DebuggerMo
 withDebugger (App model update view subs events initialAction) =
   App model' update' view' (map mapSub subs) events (Other initialAction)
   where
-    model' = DebuggerModel (RoseZipper (RoseTree (model, Nothing) []) [])
-    update' (Move ms) (DebuggerModel tree) =
-      noEff (DebuggerModel (applyMove ms tree))
-    update' (Other act) model@(DebuggerModel tree) =
+    model' =
+      DebuggerModel (RoseZipper (RoseTree (model, Nothing) []) []) Nothing
+    update' (AnimationFrame now) (DebuggerModel tree Nothing) =
+      noEff (DebuggerModel tree Nothing)
+    update' (AnimationFrame now') (DebuggerModel tree (Just (AnimationState startPos startTime t)))
+      | now' - startTime > 1000 * animationDuration =
+        noEff (DebuggerModel tree Nothing)
+      | otherwise =
+        DebuggerModel
+          tree
+          (Just
+             (AnimationState
+                startPos
+                startTime
+                ((now' - startTime) / (1000 * animationDuration)))) <#
+        (AnimationFrame <$> now)
+    update' (Move ms) model = model <# (StartAnimation ms <$> now)
+    update' (StartAnimation ms time) (DebuggerModel tree _) =
+      let lastFocusedPos = getFocusedPos tree
+      in DebuggerModel
+           (applyMove ms tree)
+           (Just (AnimationState lastFocusedPos time 0)) <#
+         (AnimationFrame <$> now)
+    update' (Other act) model@(DebuggerModel tree _) =
       case update act (extractModel model) of
         Effect m' acts ->
           let tree' = insertAndMoveTo (RoseTree (m', Just act) []) tree
-          in Effect (DebuggerModel tree') (map (fmap Other) acts)
+          in Effect (DebuggerModel tree' Nothing) (map (fmap Other) acts)
     view' model =
       div_ [] [renderDebugger model, fmapView Other (view (extractModel model))]
     mapSub ::
@@ -193,3 +247,4 @@ withDebugger (App model update view subs events initialAction) =
       mapSubAction
         Other
         (\readModel sink -> sub (fmap extractModel readModel) sink)
+    animationDuration = 0.1
