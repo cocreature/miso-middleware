@@ -74,15 +74,18 @@ renderDebugger m@(DebuggerModel tree) =
   div_
     [style_ (Map.fromList [("display", "flex")])]
     [ Svg.svg_
-        [ width_ "400"
-        , height_ "300"
+        [ width_ (show' width)
+        , height_ (show' height)
         , style_ (Map.fromList [("border-style", "solid")])
         ]
-        [drawTree (unfoldZipper (withZipperMoves (fmap snd tree)))]
+        [drawTree (width, height) (unfoldZipper (withZipperMoves (fmap snd tree)))]
     , div_
         [style_ (Map.fromList [("margin", "10px 10px")])]
         [h3_ [] ["Current state"], text (ms (show (extractModel m)))]
     ]
+  where
+    width = 400
+    height = 300
 
 withPositions :: RoseTree (WithLocation a) -> RoseTree ((Double, Double), a)
 withPositions tree = withPos 0 tree
@@ -92,22 +95,29 @@ withPositions tree = withPos 0 tree
     withPos !level (RoseTree (WithLocation v xPos) cs) =
       RoseTree ((x, y), v) (map (withPos (level + 1)) cs)
       where
-        x = 20 * xPos
-        y = 20 * level
+        x = 50 * xPos
+        y = 50 * level
 
-drawTree :: Show action => RoseTree ([Direction], Maybe action) -> View (DebuggerAction action)
-drawTree tree = Svg.svg_ [] (drawTree' locatedTree ++ drawFocused locatedTree)
+show' :: Show a => a -> MisoString
+show' = ms . show
+
+drawTree :: Show action => (Int, Int) -> RoseTree ([Direction], Maybe action) -> View (DebuggerAction action)
+drawTree (width, height) tree =
+  Svg.g_
+    [ Svg.transform_
+        ("translate" <>
+         show' (fromIntegral width / 2 - x, fromIntegral height / 2 - y))
+    ]
+    (drawTree' locatedTree ++ drawFocused locatedTree)
   where
-    locatedTree =
-      fmap (\((x', y'), v) -> ((50 + x' - x, 50 + y' - y), v)) locatedTree'
-    locatedTree' = withPositions (makeAbsolute (design tree))
-    (x, y) = head (getFocused locatedTree')
+    locatedTree = withPositions (makeAbsolute (design tree))
+    (x, y) = head (getFocused locatedTree)
     drawTree' (RoseTree ((x, y), (moves, _)) cs) =
       lines ++
       Svg.circle_
         [ Svg.r_ "10"
-        , Svg.cx_ (ms (show x) <> "%")
-        , Svg.cy_ (ms (show y) <> "%")
+        , Svg.cx_ (show' x)
+        , Svg.cy_ (show' y)
         , Svg.onClick (Move moves)
         ]
         [] :
@@ -117,10 +127,10 @@ drawTree tree = Svg.svg_ [] (drawTree' locatedTree ++ drawFocused locatedTree)
           map
             (\(RoseTree ((x', y'), (_, act)) _) ->
                Svg.line_
-                 [ Svg.x1_ (ms (show x) <> "%")
-                 , Svg.y1_ (ms (show y) <> "%")
-                 , Svg.x2_ (ms (show x') <> "%")
-                 , Svg.y2_ (ms (show y') <> "%")
+                 [ Svg.x1_ (show' x)
+                 , Svg.y1_ (show' y)
+                 , Svg.x2_ (show' x')
+                 , Svg.y2_ (show' y')
                  , Svg.stroke_ "black"
                  , Svg.strokeWidth_ "4"
                  ]
@@ -139,8 +149,8 @@ drawFocused :: RoseTree ((Double,Double), ([Direction], model)) -> [View (Debugg
 drawFocused (RoseTree ((x, y), ([], _)) _) =
   [ Svg.circle_
       [ Svg.r_ "12"
-      , Svg.cx_ (ms (show x) <> "%")
-      , Svg.cy_ (ms (show y) <> "%")
+      , Svg.cx_ (show' x)
+      , Svg.cy_ (show' y)
       , Svg.strokeWidth_ "4"
       , Svg.stroke_ "orange"
       ]
