@@ -236,8 +236,10 @@ withDebugger (App model update view subs events initialAction) =
     update' (Other act) model@(DebuggerModel tree _) =
       case update act (extractModel model) of
         Effect m' acts ->
-          let tree' = insertAndMoveTo (RoseTree (m', Just act) []) tree
-          in Effect (DebuggerModel tree' Nothing) (map (fmap Other) acts)
+          let tree' = addChild (RoseTree (m', Just act) []) tree
+          in Effect
+               (DebuggerModel tree' Nothing)
+               (pure (Move [Down 0]) : map (fmap Other) (acts))
     view' model =
       div_ [] [renderDebugger model, fmapView Other (view (extractModel model))]
     mapSub ::
