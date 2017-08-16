@@ -33,8 +33,8 @@ splitAt' :: Int -> [a] -> Maybe ([a], a, [a])
 splitAt' _ [] = Nothing
 splitAt' 0 (x:xs) = Just ([], x, xs)
 splitAt' i (x:xs) = do
-  (ls, x, rs) <- splitAt' (i - 1) xs
-  pure (x : ls, x, rs)
+  (ls, x', rs) <- splitAt' (i - 1) xs
+  pure (x : ls, x', rs)
 
 moveDown :: Int -> RoseZipper a -> Maybe (RoseZipper a)
 moveDown i (RoseZipper (RoseTree v cs) ps) = do
