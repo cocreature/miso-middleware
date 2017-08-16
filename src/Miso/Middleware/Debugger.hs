@@ -130,10 +130,23 @@ getFocusedPos =
 (^+^) :: Num a => (a, a) -> (a, a) -> (a, a)
 (!x,!y) ^+^ (!x',!y') = (x+x', y+y')
 
+(^-^) :: Num a => (a,a) -> (a,a) -> (a,a)
+(!x,!y) ^-^ (!x',!y') = (x-x',y-y')
+
+infixl 7 *^
+infixl 6 ^+^
+infixl 6 ^-^
+
 interpolate :: Maybe AnimationState -> (Double, Double) -> (Double, Double)
 interpolate Nothing pos = pos
 interpolate (Just (AnimationState start _ t)) pos =
-  ((1 - t) *^ start) ^+^ (t *^ pos)
+  easeOut t start (pos^-^start)
+
+easeIn :: Double -> (Double,Double) -> (Double,Double) -> (Double,Double)
+easeIn t b c = (t * t) *^ c ^+^ b
+
+easeOut :: Double -> (Double,Double) -> (Double,Double) -> (Double,Double)
+easeOut t b c = (t * (2-t)) *^ c ^+^ b
 
 drawTree :: Show action => (Int, Int) -> Maybe AnimationState -> RoseTree ([Direction], Maybe action) -> View (DebuggerAction action)
 drawTree (width, height) animationState tree =
@@ -249,4 +262,4 @@ withDebugger (App model update view subs events initialAction) =
       mapSubAction
         Other
         (\readModel sink -> sub (fmap extractModel readModel) sink)
-    animationDuration = 0.1
+    animationDuration = 0.3
