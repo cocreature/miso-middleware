@@ -1,6 +1,6 @@
 # miso-middleware
 
-[![Travis](https://img.shields.io/travis/cocreature/miso-middleware.svg)](https://travis-ci.org/cocreature/miso-middleware) [![Hackage](https://img.shields.io/hackage/v/miso-middleware.svg)](https://hackage.haskell.org/package/miso-middleware)
+[![CircleCI](https://img.shields.io/circleci/project/github/cocreature/miso-middleware.svg)](https://circleci.com/gh/cocreature/miso-middleware) [![Hackage](https://img.shields.io/hackage/v/miso-middleware.svg)](https://hackage.haskell.org/package/miso-middleware)
 
 A collection of _middlewares_
 for [miso](https://github.com/haskell-miso/miso), a Haskell front-end
