@@ -82,23 +82,71 @@ withTreeMoves (RoseTree v cs) =
        cs
        [0 ..])
 
+css :: MisoString
+css =
+  ".debugger {\
+  \  position: fixed;\
+  \  right: 0;\
+  \  top: 0;\
+  \  display: flex;\
+  \  flex-direction: column;\
+  \  align-items: stretch;\
+  \}\
+  \.debugger-controls {\
+  \  display: flex;\
+  \  flex-direction: row;\
+  \  justify-content: space-around;\
+  \}\
+  \.debugger-controls button {\
+  \  margin: 5px;\
+  \}\
+  \.model-state {\
+  \  display: flex;\
+  \  flex-direction: column;\
+  \}\
+  \.outer-debugger {\
+  \  display: flex;\
+  \}\
+  \.debugger hr {\
+  \  margin: 10px 0;\
+  \}"
+
 renderDebugger :: (Show model, Show action) => DebuggerModel action model -> View (DebuggerAction action)
 renderDebugger m@(DebuggerModel tree animationState) =
   div_
-    [style_ (Map.fromList [("display", "flex")])]
-    [ Svg.svg_
-        [ width_ (show' width)
-        , height_ (show' height)
-        , style_ (Map.fromList [("border-style", "solid")])
-        ]
-        [ drawTree
-            (width, height)
-            animationState
-            (unfoldZipper (withZipperMoves (fmap snd tree)))
-        ]
+    []
+    [ nodeHtml "style" [] [text css]
     , div_
-        [style_ (Map.fromList [("margin", "10px 10px")])]
-        [h3_ [] ["Current state"], text (ms (show (extractModel m)))]
+        [class_ "debugger"]
+        [ div_
+            [class_ "model"]
+            [ h3_ [] ["Model"]
+            , div_ [class_ "model-value"] [text (ms (show (extractModel m)))]
+            ]
+        , hr_ [] []
+        , renderStateTree tree animationState
+        , hr_ [] []
+        , div_ [class_ "debugger-controls"] (map goBackButton [5, 10, 50])
+        ]
+    ]
+  where
+    goBackButton n =
+      button_
+        [onClick (Move (replicate n Up))]
+        [text ("Go back " <> show' n <> " states")]
+
+renderStateTree ::
+  (Show model, Show action) =>
+  RoseZipper (model, Maybe action) ->
+  Maybe AnimationState ->
+  View (DebuggerAction action)
+renderStateTree tree animationState =
+  Svg.svg_
+    [width_ (show' width), height_ (show' height)]
+    [ drawTree
+        (width, height)
+        animationState
+        (unfoldZipper (withZipperMoves (fmap snd tree)))
     ]
   where
     width = 400
@@ -254,7 +302,7 @@ withDebugger (App model update view subs events initialAction) =
                (DebuggerModel tree' Nothing)
                (pure (Move [Down 0]) : map (fmap Other) (acts))
     view' model =
-      div_ [] [renderDebugger model, fmapView Other (view (extractModel model))]
+      div_ [] [fmapView Other (view (extractModel model)), renderDebugger model]
     mapSub ::
          Sub action model
       -> Sub (DebuggerAction action) (DebuggerModel action model)
