@@ -267,6 +267,8 @@ applyMove (Down i:ms) t =
     Just t' -> applyMove ms t'
     Nothing -> t
 
+-- | Adds a debugger to 'App' that records all state transitions and
+-- provides an interface for viewing these transitions.
 withDebugger :: (Show model, Show action) => App model action -> App (DebuggerModel action model) (DebuggerAction action)
 withDebugger (App model update view subs events initialAction) =
   App model' update' view' (map mapSub subs) events (Other initialAction)

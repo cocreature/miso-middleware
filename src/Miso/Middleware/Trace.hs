@@ -14,6 +14,8 @@ data TraceAction action
   | OtherTraceAction !action
   deriving (Show, Eq, Ord)
 
+-- | Creates an 'App' that dumps all state transitions to the console
+-- for debugging purposes.
 withTrace :: (Show action, Show model) => App model action -> App model (TraceAction action)
 withTrace (App model update view subs events initialAction) =
   App
