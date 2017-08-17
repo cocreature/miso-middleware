@@ -1,5 +1,7 @@
 # miso-middleware
 
+[![Travis](https://img.shields.io/travis/cocreature/miso-middleware.svg)]() [![Hackage](https://img.shields.io/hackage/v/miso-middleware.svg)](https://hackage.haskell.org/package/miso-middleware)
+
 A collection of _middlewares_ for
 the [miso](https://github.com/haskell-miso/miso), a Haskell front-end
 webframework. A _middleware_ is a function that modifies the behavior
