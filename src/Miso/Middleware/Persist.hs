@@ -45,5 +45,5 @@ withPersistentModel persistAction (App model update view subs events initialActi
                 setLocalStorage "miso.persist.model" model') :
                map (fmap OtherAction) acts)
           | otherwise -> Effect model' (map (fmap OtherAction) acts)
-    view' = \model -> fmapView OtherAction (view model)
+    view' = \model -> fmap OtherAction (view model)
     subs' = map (mapSubAction OtherAction) subs

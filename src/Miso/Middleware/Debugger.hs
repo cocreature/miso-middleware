@@ -302,7 +302,7 @@ withDebugger (App model update view subs events initialAction) =
                (DebuggerModel tree' Nothing)
                (pure (Move [Down 0]) : map (fmap Other) (acts))
     view' model =
-      div_ [] [fmapView Other (view (extractModel model)), renderDebugger model]
+      div_ [] [fmap Other (view (extractModel model)), renderDebugger model]
     mapSub ::
          Sub action model
       -> Sub (DebuggerAction action) (DebuggerModel action model)

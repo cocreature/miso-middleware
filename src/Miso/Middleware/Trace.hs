@@ -19,7 +19,7 @@ withTrace (App model update view subs events initialAction) =
   App
     model
     update'
-    (fmapView OtherTraceAction . view)
+    (fmap OtherTraceAction . view)
     (map (mapSubAction OtherTraceAction) subs)
     events
     (OtherTraceAction initialAction)
@@ -32,6 +32,7 @@ withTrace (App model update view subs events initialAction) =
             model'
             ((Traced <$ putStrLn (formatTrace action model model')) :
              map (fmap OtherTraceAction) acts)
-    formatTrace :: (Show action, Show model) => action -> model -> model -> String
+    formatTrace ::
+         (Show action, Show model) => action -> model -> model -> String
     formatTrace action oldModel newModel =
-     "(" <> show action <> " ," <> show oldModel <> ") → " <> show newModel
+      "(" <> show action <> " ," <> show oldModel <> ") → " <> show newModel
