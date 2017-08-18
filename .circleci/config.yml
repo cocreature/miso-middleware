@@ -8,6 +8,11 @@ jobs:
       - restore_cache:
           key: stack-dependencies
       - run:
+          name: Install node
+          command: |
+            curl -sL https://deb.nodesource.com/setup_8.x | sudo -E bash -
+            sudo apt-get install -y nodejs
+      - run:
           name: Setup GHCJS and install Haskell dependencies
           command: stack --no-terminal --install-ghc test --only-dependencies
       - save_cache:
